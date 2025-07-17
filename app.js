@@ -1,21 +1,19 @@
+import { inicializarDB, guardarComentario, traerComentarios, guardarComentarioPendiente, revisarComentariosPendientes } from './db.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 import {
   getAuth,
-  onAuthStateChanged,
   signInWithEmailAndPassword,
-  signOut,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
   GoogleAuthProvider,
-  signInWithPopup
+  signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-import {
-  inicializarDB,
-  guardarComentario,
-  guardarComentarioPendiente,
-  reenviarComentariosPendientes
-} from './db.js';
 import { crearRating } from './componentes/rating.js';
 import { mostrarComentarios } from './componentes/listaComentarios.js';
+
+const content = document.getElementById('content');
+const buttons = document.querySelectorAll('.tabs button');
 
 const firebaseConfig = {
   apiKey: "AIzaSyAk0_WA4Zal3m7b_vOC70aPaQeYZqpe_00",
@@ -30,27 +28,19 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-const imagenesCategoria = {
-  limpieza: "assets/limpieza.jpg",
-  transporte: "assets/transporte.jpg",
-  verdes: "assets/espaciosverdes.jpeg",
-  eventos: "assets/eventos.jpg",
-  subte: "assets/subte.jpg",
-  seguridad: "assets/seguridad.jpg",
-  accesibilidad: "assets/accesibilidad.jpg"
-};
-
-const content = document.getElementById('content');
-const buttons = document.querySelectorAll('.tabs button');
-const loginForm = document.getElementById('login-form');
-const logoutBtn = document.getElementById('logout');
-const loginBtn = document.getElementById('login-btn');
-const googleBtn = document.getElementById('google-btn');
-const welcomeText = document.getElementById('welcome');
-const appContainer = document.getElementById('app');
+const emailEl = document.getElementById("email");
+const passEl = document.getElementById("password");
+const confirmEl = document.getElementById("confirm-password");
+const formTitle = document.getElementById("form-title");
+const submitBtn = document.getElementById("submitBtn");
+const toggleBtn = document.getElementById("toggleBtn");
+const googleBtn = document.getElementById("googleBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+const welcomeText = document.getElementById("welcome");
 
 const isLoginPage = window.location.pathname.includes("login.html");
 
+// Firebase Cloud Messaging -> Configuración Notificaciones Push
 const messaging = getMessaging(app);
 const VAPID_KEY = "BNXs6Wmh8HeBnrqtZjgKdMCCYkv9vXUS2zWGjQU7SYvjqgGTz1zrxhfNmSYbN9kH1Gwn05GoEILAJ6s0DzafHLQ";
 
@@ -80,56 +70,77 @@ onMessage(messaging, payload => {
   alert(payload.notification.title + ": " + payload.notification.body);
 });
 
-loginBtn.addEventListener('click', async () => {
-  const email = document.getElementById('email').value;
-  const pass = document.getElementById('password').value;
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-    localStorage.setItem('userEmail', userCredential.user.email);
-  } catch (e) {
-    alert("Login fallido: " + e.message);
-  }
-});
+if (isLoginPage) {
+  let isLogin = true;
 
-googleBtn.addEventListener('click', async () => {
-  try {
-    const result = await signInWithPopup(auth, provider);
-    localStorage.setItem('userEmail', result.user.email);
-  } catch (e) {
-    alert("Login con Google fallido: " + e.message);
-  }
-});
+  toggleBtn.addEventListener("click", () => {
+    isLogin = !isLogin;
+    confirmEl.classList.toggle("hidden", isLogin);
+    formTitle.textContent = isLogin ? "Iniciar Sesión" : "Registrarse";
+    submitBtn.textContent = isLogin ? "Ingresar" : "Registrarse";
+    toggleBtn.textContent = isLogin ? "¿No tenés cuenta? Registrate" : "¿Ya tenés cuenta? Ingresá";
+  });
 
-logoutBtn.addEventListener('click', async () => {
-  await signOut(auth);
-  localStorage.removeItem('userEmail');
-});
+  submitBtn.addEventListener("click", () => {
+    const email = emailEl.value;
+    const password = passEl.value;
+    const confirm = confirmEl.value;
 
-onAuthStateChanged(auth, user => {
-  if (user) {
-    loginForm.style.display = "none";
-    appContainer.style.display = "block";
-    welcomeText.textContent = user.email;
-    localStorage.setItem('userEmail', user.email);
-  } else {
-    loginForm.style.display = "block";
-    appContainer.style.display = "none";
-    localStorage.removeItem('userEmail');
-  }
-});
-
-buttons.forEach(btn => {
-  btn.addEventListener('click', async () => {
-    const userEmail = localStorage.getItem('userEmail');
-    if (!userEmail) {
-      alert("Debes iniciar sesión para comentar.");
+    if (!email || !password || (!isLogin && password !== confirm)) {
+      alert("Completá todos los campos correctamente");
       return;
     }
 
+    const action = isLogin
+      ? signInWithEmailAndPassword(auth, email, password)
+      : createUserWithEmailAndPassword(auth, email, password);
+
+    action
+      .then(result => {
+        localStorage.setItem("user", JSON.stringify({ email: result.user.email }));
+        solicitarPermisoNotificaciones();
+        window.location.href = "index.html";
+
+      })
+      .catch(err => alert("Las credenciales son incorrectas"));
+  });
+
+  googleBtn.addEventListener("click", () => {
+    signInWithPopup(auth, provider)
+      .then(result => {
+        localStorage.setItem("user", JSON.stringify({ email: result.user.email }));
+        solicitarPermisoNotificaciones();
+        window.location.href = "index.html";
+      })
+      .catch(err => alert(err.message));
+  });
+} else {
+  const saved = JSON.parse(localStorage.getItem("user"));
+  if (saved?.email && welcomeText) {
+    welcomeText.textContent = saved.email;
+    if (logoutBtn) logoutBtn.classList.remove("hidden");
+
+    solicitarPermisoNotificaciones();
+  }
+
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => {
+      signOut(auth).then(() => {
+        localStorage.removeItem("user");
+        window.location.reload();
+      });
+    });
+  }
+}
+
+//  IndexedDB
+
+buttons.forEach(btn => {
+  btn.addEventListener('click', async () => {
     const categoria = btn.dataset.tab;
     content.innerHTML = `
       <h2>${btn.textContent}</h2>
-      <img src="${imagenesCategoria[categoria]}" alt="${categoria}" style="max-width: 100%; border-radius: 10px; margin-bottom: 1rem;">
       <label>Tu comentario:</label><br/>
       <textarea id="comentario"></textarea><br/>
       <label>Tu puntuación:</label>
@@ -138,36 +149,22 @@ buttons.forEach(btn => {
       <h3>Comentarios anteriores:</h3>
       <div id="comentarios"></div>
     `;
-
     crearRating(document.getElementById('calificacion'));
 
     document.getElementById('submit').addEventListener('click', async () => {
       const texto = document.getElementById('comentario').value;
       const calificacion = document.querySelectorAll('.calificacion.selected').length;
-      const comentario = {
-        texto,
-        calificacion,
-        fecha: new Date().toISOString(),
-        email: userEmail
-      };
-
-      if (navigator.onLine) {
-        await guardarComentario(categoria, comentario);
+      if(navigator.onLine) {
+         await guardarComentario(categoria, { texto, calificacion, fecha: new Date().toISOString() });
       } else {
-        await guardarComentarioPendiente(categoria, comentario);
+        await guardarComentarioPendiente(categoria, { texto, calificacion, fecha: new Date().toISOString() });
       }
-
       document.getElementById('comentario').value = "";
       mostrarComentarios(categoria, document.getElementById('comentarios'));
     });
 
     mostrarComentarios(categoria, document.getElementById('comentarios'));
   });
-});
-
-window.addEventListener("online", async () => {
-  console.log("Conexión restaurada. Enviando comentarios pendientes...");
-  await reenviarComentariosPendientes();
 });
 
 inicializarDB();
