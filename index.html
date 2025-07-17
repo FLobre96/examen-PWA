@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.png" type="image/png">
+  <meta name="theme-color" content="#4285f4" />
+  <title>PWA ITLM</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="nav">
+    <a href=""><img src="icon.png" class="logo"/></a>
+    <h1>Ciudad de Buenos Aires</h1>
+    <div>
+      <p id="welcome"></p>
+      <a href="login.html"><button>Ir a Login</button></a>
+      <button id="logoutBtn" class="hidden">Cerrar sesión</button>
+    </div>
+  </div>
+  <div class="tabs">
+    <button data-tab="limpieza">Limpieza</button>
+    <button data-tab="transporte">Transporte</button>
+    <button data-tab="verdes">Espacios Verdes</button>
+    <button data-tab="eventos">Eventos Gratuitos</button>
+    <button data-tab="subte">Subte</button>
+    <button data-tab="seguridad">Seguridad</button>
+    <button data-tab="accesibilidad">Accesibilidad</button>
+  </div>
+   <div id="content"></div>
+
+  <script type="module" src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+      .then(registration => {
+        console.log("Service Worker registrado para notificaciones:", registration);
+      });
+    }
+  </script>
+</body>
+</html>
