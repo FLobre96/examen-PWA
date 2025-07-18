@@ -14,6 +14,10 @@ import {
   onAuthStateChanged,
   signOut,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getMessaging,
+  onMessage
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
 import { guardarComentarioPendiente, sincronizarComentariosPendientes } from "./db.js";
 
@@ -29,6 +33,39 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const messaging = getMessaging(app);
+
+// Registrar Service Worker para FCM
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/firebase-messaging-sw.js')
+  .then(registration => {
+    console.log('Service Worker registrado:', registration);
+  }).catch(err => {
+    console.error('Error registrando Service Worker:', err);
+  });
+}
+
+// Manejar mensajes en primer plano con onMessage
+onMessage(messaging, (payload) => {
+  console.log('Mensaje recibido en primer plano:', payload);
+  alert("FCM recibido (test)."); // Para confirmar si entra
+  if (Notification.permission === 'granted') {
+    navigator.serviceWorker.getRegistration().then(registration => {
+      if (registration) {
+        registration.showNotification("Test Notificación", {
+          body: "Notificación mostrada por Service Worker.",
+          icon: "icon.png"
+        });
+      } else {
+        alert("No hay Service Worker registrado.");
+      }
+    });
+  } else {
+    alert("No hay permiso de notificaciones.");
+  }
+});
+
+// --- Tu código original sigue igual ---
 
 const logoutBtn = document.getElementById("logout");
 const welcomeText = document.getElementById("welcome");
@@ -50,7 +87,7 @@ onAuthStateChanged(auth, (user) => {
     loginForm.style.display = "none";
     welcomeText.textContent = user.email;
     sincronizarComentariosPendientes();
-    // Mostrar la primera categoría por defecto
+    
     if (tabs.length > 0) {
       mostrarCategoria(tabs[0].getAttribute("data-tab"));
       tabs[0].classList.add("active");
@@ -62,16 +99,13 @@ onAuthStateChanged(auth, (user) => {
 });
 
 function mostrarCategoria(categoria) {
-  // Limpiar contenido
   contentDiv.innerHTML = "";
 
-  // Crear contenedor comentarios
   const comentariosCont = document.createElement("div");
   comentariosCont.id = `comentarios-${categoria}`;
   comentariosCont.innerHTML = "<p>Cargando comentarios...</p>";
   contentDiv.appendChild(comentariosCont);
 
-  // Crear formulario para enviar comentarios
   const form = document.createElement("form");
   form.dataset.categoria = categoria;
   form.innerHTML = `
@@ -80,7 +114,6 @@ function mostrarCategoria(categoria) {
   `;
   contentDiv.appendChild(form);
 
-  // Mostrar comentarios en tiempo real desde Firestore
   const q = query(
     collection(db, "comentarios"),
     where("categoria", "==", categoria),
@@ -98,7 +131,6 @@ function mostrarCategoria(categoria) {
     });
   });
 
-  // Manejar envío formulario
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const input = form.querySelector("input[name='comentario']");
@@ -130,7 +162,6 @@ function mostrarCategoria(categoria) {
   });
 }
 
-// Manejar cambio de tab
 tabs.forEach(tab => {
   tab.addEventListener("click", () => {
     tabs.forEach(t => t.classList.remove("active"));
@@ -139,7 +170,6 @@ tabs.forEach(tab => {
   });
 });
 
-// Sincronizar cuando vuelve conexión
 window.addEventListener("online", () => {
   sincronizarComentariosPendientes();
 });

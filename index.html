@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#4285f4" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.png" type="image/png" />
@@ -16,9 +16,12 @@
     <h1>Ciudad de Buenos Aires</h1>
   </div>
 
-  <div id="login-form" style="display: none;">
-    <!-- Para usuarios no autenticados, se puede reutilizar login.html o un mensaje -->
-    <p>Por favor, <a href="login.html">iniciar sesión</a> para enviar comentarios.</p>
+  <div id="login-form">
+    <h2>Iniciar Sesión</h2>
+    <input type="email" id="email" placeholder="Email"><br>
+    <input type="password" id="password" placeholder="Contraseña"><br>
+    <button id="login-btn">Ingresar</button>
+    <button id="google-btn">Ingresar con Google</button>
   </div>
 
   <div id="app" style="display: none;">
@@ -39,7 +42,7 @@
     </div>
 
     <div id="content">
-      <!-- Aquí se cargan los comentarios y formulario para cada categoría -->
+
     </div>
   </div>
 
@@ -48,9 +51,10 @@
 
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').then(registration => {
-        console.log("Service Worker registrado:", registration);
-      });
+      navigator.serviceWorker.register('sw.js')
+        .then(registration => {
+          console.log("Service Worker registrado:", registration);
+        });
     }
   </script>
 </body>

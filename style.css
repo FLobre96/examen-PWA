@@ -108,7 +108,7 @@ textarea {
   border: none;
   cursor: pointer;
 }
-/* Agrega al final del style.css */
+
 .tabs button.active {
   box-shadow: 0 0 15px 3px var(--tab-hover);
   background-color: var(--tab-hover);

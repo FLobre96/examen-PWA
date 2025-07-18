@@ -1,4 +1,4 @@
-// IndexedDB setup
+// db.js
 let db;
 
 export function inicializarDB() {
@@ -7,11 +7,11 @@ export function inicializarDB() {
 
     request.onupgradeneeded = (event) => {
       db = event.target.result;
+      if (!db.objectStoreNames.contains("comentarios")) {
+        db.createObjectStore("comentarios", { keyPath: "id", autoIncrement: true });
+      }
       if (!db.objectStoreNames.contains("comentariosPendientes")) {
-        db.createObjectStore("comentariosPendientes", {
-          keyPath: "id",
-          autoIncrement: true
-        });
+        db.createObjectStore("comentariosPendientes", { keyPath: "id", autoIncrement: true });
       }
     };
 
@@ -26,6 +26,18 @@ export function inicializarDB() {
   });
 }
 
+
+export function guardarComentario(categoria, comentario) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("comentarios", "readwrite");
+    const store = tx.objectStore("comentarios");
+    const req = store.add({ ...comentario, categoria });
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject();
+  });
+}
+
+
 export function guardarComentarioPendiente(categoria, comentario) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction("comentariosPendientes", "readwrite");
@@ -33,6 +45,18 @@ export function guardarComentarioPendiente(categoria, comentario) {
     const req = store.add({ categoria, ...comentario });
     req.onsuccess = () => resolve();
     req.onerror = () => reject();
+  });
+}
+
+
+export function traerComentarios(categoria) {
+  return new Promise((resolve) => {
+    const tx = db.transaction("comentarios", "readonly");
+    const store = tx.objectStore("comentarios");
+    const request = store.getAll();
+    request.onsuccess = () => {
+      resolve(request.result.filter(c => c.categoria === categoria));
+    };
   });
 }
 
@@ -45,17 +69,39 @@ export function obtenerComentariosPendientes() {
   });
 }
 
+
+export function reenviarComentariosPendientes() {
+  return new Promise((resolve) => {
+    const tx = db.transaction("comentariosPendientes", "readwrite");
+    const store = tx.objectStore("comentariosPendientes");
+    const getAllRequest = store.getAll();
+
+    getAllRequest.onsuccess = async () => {
+      const pendientes = getAllRequest.result;
+
+      for (const comentario of pendientes) {
+        try {
+          await guardarComentario(comentario.categoria, comentario);
+          store.delete(comentario.id); 
+        } catch (e) {
+          console.error("Error reenviando comentario pendiente:", e);
+        }
+      }
+
+      resolve();
+    };
+  });
+}
+
+
 export async function sincronizarComentariosPendientes() {
   await inicializarDB();
-
   const comentariosPendientes = await obtenerComentariosPendientes();
   if (comentariosPendientes.length === 0) return;
 
-  // Import Firestore functions dynamically to avoid circular deps
   const { getFirestore, collection, addDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
   const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
 
-  // Config debe estar igual que el resto del proyecto
   const firebaseConfig = {
     apiKey: "AIzaSyAk0_WA4Zal3m7b_vOC70aPaQeYZqpe_00",
     authDomain: "examenpwa.firebaseapp.com",
@@ -71,7 +117,6 @@ export async function sincronizarComentariosPendientes() {
   for (const comentario of comentariosPendientes) {
     try {
       await addDoc(collection(dbFirestore, "comentarios"), comentario);
-      // Eliminar del IDB si se quiere implementar eliminación
       const tx = db.transaction("comentariosPendientes", "readwrite");
       tx.objectStore("comentariosPendientes").delete(comentario.id);
     } catch (error) {
