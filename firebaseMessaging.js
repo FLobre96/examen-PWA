@@ -1,13 +1,11 @@
-// firebaseMessaging.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 
-// Tu configuración de Firebase (reemplazá estos datos con los tuyos)
 const firebaseConfig = {
   apiKey: "AIzaSyAk0_WA4Zal3m7b_vOC70aPaQeYZqpe_00",
   authDomain: "examenpwa.firebaseapp.com",
   projectId: "examenpwa",
-  storageBucket: "examenpwa.firebasestorage.app",
+  storageBucket: "examenpwa.appspot.com",
   messagingSenderId: "103530121016",
   appId: "1:103530121016:web:c0eef3027aa38c526063cd"
 };
@@ -15,36 +13,24 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const messaging = getMessaging(app);
 
-// Solicita permisos para notificaciones
-export function solicitarPermisoNotificaciones() {
-  Notification.requestPermission().then((permiso) => {
-    if (permiso === 'granted') {
-      console.log("Permiso para notificaciones concedido");
-      obtenerToken();
-    } else {
-      console.warn("Permiso para notificaciones denegado");
-    }
-  });
-}
+Notification.requestPermission().then((permission) => {
+  if (permission === "granted") {
+    getToken(messaging, { vapidKey: 'TU_PUBLIC_VAPID_KEY_AQUI' }).then((currentToken) => {
+      if (currentToken) {
+        console.log("Token de notificación:", currentToken);
+        // Aquí podés enviar el token al servidor o Firestore si hiciera falta
+      } else {
+        console.warn("No se pudo obtener el token de notificación");
+      }
+    }).catch((err) => {
+      console.error("Error al obtener token de notificación", err);
+    });
+  }
+});
 
-// Obtiene el token del dispositivo
-function obtenerToken() {
-  getToken(messaging, {
-    vapidKey: "BNXs6Wmh8HeBnrqtZjgKdMCCYkv9vXUS2zWGjQU7SYvjqgGTz1zrxhfNmSYbN9kH1Gwn05GoEILAJ6s0DzafHLQ" // VAPID pública configurada en Firebase
-  }).then((token) => {
-    if (token) {
-      console.log("Token de dispositivo:", token);
-      // Enviar al servidor si se desea
-    } else {
-      console.log("No se obtuvo token. Solicitar permisos nuevamente.");
-    }
-  }).catch((err) => {
-    console.error("Error al obtener el token:", err);
-  });
-}
-
-// Maneja notificaciones cuando la app está abierta
 onMessage(messaging, (payload) => {
-  console.log("Notificación recibida en primer plano:", payload);
-  alert(`Notificación: ${payload.notification.title}\n${payload.notification.body}`);
+  console.log("Mensaje recibido en primer plano:", payload);
+  if (payload.notification) {
+    alert(`${payload.notification.title}: ${payload.notification.body}`);
+  }
 });

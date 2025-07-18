@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Login / Registro</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -56,9 +56,13 @@
     });
 
     submitBtn.addEventListener("click", async () => {
-      const email = emailInput.value;
+      const email = emailInput.value.trim();
       const password = passwordInput.value;
 
+      if (!email || !password) {
+        alert("Completar todos los campos");
+        return;
+      }
       if (!isLogin && password !== confirmPasswordInput.value) {
         alert("Las contraseñas no coinciden");
         return;
@@ -70,7 +74,9 @@
         } else {
           await createUserWithEmailAndPassword(auth, email, password);
         }
-        window.location.href = "index.html"; // Redirige a encuestas
+        // Al iniciar sesión guardar email en localStorage
+        localStorage.setItem("usuario", JSON.stringify({ email }));
+        window.location.href = "index.html";
       } catch (error) {
         alert("Error: " + error.message);
       }
@@ -78,7 +84,9 @@
 
     googleBtn.addEventListener("click", async () => {
       try {
-        await signInWithPopup(auth, provider);
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        localStorage.setItem("usuario", JSON.stringify({ email: user.email }));
         window.location.href = "index.html";
       } catch (error) {
         alert("Error con Google: " + error.message);
@@ -89,9 +97,10 @@
       window.location.href = "index.html";
     });
 
-    // Redirigir automáticamente si ya está logueado
+    // Redirigir si ya está logueado
     onAuthStateChanged(auth, user => {
       if (user) {
+        localStorage.setItem("usuario", JSON.stringify({ email: user.email }));
         window.location.href = "index.html";
       }
     });

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#4285f4" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icon.png" type="image/png" />
@@ -16,17 +16,9 @@
     <h1>Ciudad de Buenos Aires</h1>
   </div>
 
-  <div id="login-form">
-    <div class="container" id="auth-container">
-      <h2 id="form-title">Iniciar Sesión</h2>
-      <input type="email" id="email" placeholder="Email" />
-      <input type="password" id="password" placeholder="Contraseña" />
-      <input type="password" id="confirm-password" placeholder="Confirmar contraseña" class="hidden" />
-      <button id="submitBtn">Ingresar</button>
-      <button id="toggleBtn">¿No tenés cuenta? Registrate</button>
-      <hr />
-      <button id="googleBtn">Ingresar con Google</button>
-    </div>
+  <div id="login-form" style="display: none;">
+    <!-- Para usuarios no autenticados, se puede reutilizar login.html o un mensaje -->
+    <p>Por favor, <a href="login.html">iniciar sesión</a> para enviar comentarios.</p>
   </div>
 
   <div id="app" style="display: none;">
@@ -34,11 +26,10 @@
       <button id="logout">Cerrar sesión</button>
     </div>
 
-    <h2>Bienvenido/a</h2>
-    <p id="welcome"></p>
+    <h2>Bienvenido/a, <span id="welcome"></span></h2>
 
     <div class="tabs">
-      <button data-tab="limpieza">Limpieza</button>
+      <button data-tab="limpieza" class="active">Limpieza</button>
       <button data-tab="transporte">Transporte</button>
       <button data-tab="verdes">Espacios Verdes</button>
       <button data-tab="eventos">Eventos Gratuitos</button>
@@ -47,107 +38,19 @@
       <button data-tab="accesibilidad">Accesibilidad</button>
     </div>
 
-    <div id="content"></div>
+    <div id="content">
+      <!-- Aquí se cargan los comentarios y formulario para cada categoría -->
+    </div>
   </div>
 
   <script type="module" src="app.js"></script>
   <script type="module" src="firebaseMessaging.js"></script>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import {
-      getAuth,
-      signInWithEmailAndPassword,
-      createUserWithEmailAndPassword,
-      signInWithPopup,
-      GoogleAuthProvider,
-      onAuthStateChanged,
-      signOut
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyAk0_WA4Zal3m7b_vOC70aPaQeYZqpe_00",
-      authDomain: "examenpwa.firebaseapp.com",
-      projectId: "examenpwa",
-      storageBucket: "examenpwa.appspot.com",
-      messagingSenderId: "103530121016",
-      appId: "1:103530121016:web:c0eef3027aa38c526063cd"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
-
-    const emailInput = document.getElementById("email");
-    const passwordInput = document.getElementById("password");
-    const confirmPasswordInput = document.getElementById("confirm-password");
-    const submitBtn = document.getElementById("submitBtn");
-    const toggleBtn = document.getElementById("toggleBtn");
-    const googleBtn = document.getElementById("googleBtn");
-    const loginForm = document.getElementById("login-form");
-    const appDiv = document.getElementById("app");
-    const logoutBtn = document.getElementById("logout");
-    const welcomeText = document.getElementById("welcome");
-
-    let isLogin = true;
-
-    toggleBtn.addEventListener("click", () => {
-      isLogin = !isLogin;
-      document.getElementById("form-title").textContent = isLogin ? "Iniciar Sesión" : "Registrarse";
-      confirmPasswordInput.classList.toggle("hidden");
-      submitBtn.textContent = isLogin ? "Ingresar" : "Registrarse";
-      toggleBtn.textContent = isLogin ? "¿No tenés cuenta? Registrate" : "¿Ya tenés cuenta? Iniciar sesión";
-    });
-
-    submitBtn.addEventListener("click", async () => {
-      const email = emailInput.value;
-      const password = passwordInput.value;
-
-      if (!isLogin && password !== confirmPasswordInput.value) {
-        alert("Las contraseñas no coinciden");
-        return;
-      }
-
-      try {
-        if (isLogin) {
-          await signInWithEmailAndPassword(auth, email, password);
-        } else {
-          await createUserWithEmailAndPassword(auth, email, password);
-        }
-      } catch (error) {
-        alert("Error: " + error.message);
-      }
-    });
-
-    googleBtn.addEventListener("click", async () => {
-      try {
-        await signInWithPopup(auth, provider);
-      } catch (error) {
-        alert("Error con Google: " + error.message);
-      }
-    });
-
-    logoutBtn.addEventListener("click", async () => {
-      await signOut(auth);
-      location.reload();
-    });
-
-    onAuthStateChanged(auth, user => {
-      if (user) {
-        loginForm.style.display = "none";
-        appDiv.style.display = "block";
-        welcomeText.textContent = user.email;
-      } else {
-        loginForm.style.display = "block";
-        appDiv.style.display = "none";
-      }
-    });
-  </script>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js')
-        .then(registration => {
-          console.log("Service Worker registrado para notificaciones:", registration);
-        });
+      navigator.serviceWorker.register('sw.js').then(registration => {
+        console.log("Service Worker registrado:", registration);
+      });
     }
   </script>
 </body>

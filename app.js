@@ -1,177 +1,145 @@
-import { inicializarDB, guardarComentario, guardarPendiente, traerPendientes, eliminarPendiente } from './db.js';
-import { crearRating } from './componentes/rating.js';
-import { mostrarComentarios } from './componentes/listaComentarios.js';
-import { guardarComentarioFirestore, messaging } from './auth.js';
-import { solicitarPermisoNotificaciones } from './firebaseMessaging.js';
-import { getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  serverTimestamp,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signOut,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+import { guardarComentarioPendiente, sincronizarComentariosPendientes } from "./db.js";
 
-const content = document.getElementById('content');
-const buttons = document.querySelectorAll('.tabs button');
+const firebaseConfig = {
+  apiKey: "AIzaSyAk0_WA4Zal3m7b_vOC70aPaQeYZqpe_00",
+  authDomain: "examenpwa.firebaseapp.com",
+  projectId: "examenpwa",
+  storageBucket: "examenpwa.appspot.com",
+  messagingSenderId: "103530121016",
+  appId: "1:103530121016:web:c0eef3027aa38c526063cd"
+};
 
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
-function crearFormulario(categoria, label) {
-  content.innerHTML = `
-    <h2>${label}</h2>
-    <img src="assets/categorias/${categoria}.jpg" class="imagen-categoria"/>
-    <label>Tu comentario:</label><br/>
-    <textarea id="comentario"></textarea><br/>
-    <label>Tu puntuación:</label>
-    <div id="calificacion"></div>
-    <button id="submit">Enviar</button>
-    <h3>Comentarios anteriores:</h3>
-    <div id="comentarios"></div>
+const logoutBtn = document.getElementById("logout");
+const welcomeText = document.getElementById("welcome");
+const appDiv = document.getElementById("app");
+const loginForm = document.getElementById("login-form");
+const contentDiv = document.getElementById("content");
+const tabs = document.querySelectorAll(".tabs button[data-tab]");
+
+logoutBtn.addEventListener("click", () => {
+  signOut(auth).then(() => {
+    localStorage.removeItem("usuario");
+    window.location.href = "login.html";
+  });
+});
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    appDiv.style.display = "block";
+    loginForm.style.display = "none";
+    welcomeText.textContent = user.email;
+    sincronizarComentariosPendientes();
+    // Mostrar la primera categoría por defecto
+    if (tabs.length > 0) {
+      mostrarCategoria(tabs[0].getAttribute("data-tab"));
+      tabs[0].classList.add("active");
+    }
+  } else {
+    appDiv.style.display = "none";
+    loginForm.style.display = "block";
+  }
+});
+
+function mostrarCategoria(categoria) {
+  // Limpiar contenido
+  contentDiv.innerHTML = "";
+
+  // Crear contenedor comentarios
+  const comentariosCont = document.createElement("div");
+  comentariosCont.id = `comentarios-${categoria}`;
+  comentariosCont.innerHTML = "<p>Cargando comentarios...</p>";
+  contentDiv.appendChild(comentariosCont);
+
+  // Crear formulario para enviar comentarios
+  const form = document.createElement("form");
+  form.dataset.categoria = categoria;
+  form.innerHTML = `
+    <input type="text" name="comentario" placeholder="Escribí tu comentario..." required />
+    <button type="submit">Enviar</button>
   `;
-  crearRating(document.getElementById('calificacion'));
+  contentDiv.appendChild(form);
 
+  // Mostrar comentarios en tiempo real desde Firestore
+  const q = query(
+    collection(db, "comentarios"),
+    where("categoria", "==", categoria),
+    orderBy("timestamp", "desc")
+  );
 
-  document.getElementById('submit').addEventListener('click', async () => {
-    const texto = document.getElementById('comentario').value.trim();
-    const calificacion = document.querySelectorAll('.calificacion.selected').length;
-    if (!texto || calificacion === 0) {
-      alert("Por favor ingresa un comentario y una calificación.");
+  onSnapshot(q, (snapshot) => {
+    comentariosCont.innerHTML = "";
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const div = document.createElement("div");
+      div.classList.add("comentario");
+      div.textContent = `${data.usuario}: ${data.comentario}`;
+      comentariosCont.appendChild(div);
+    });
+  });
+
+  // Manejar envío formulario
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = form.querySelector("input[name='comentario']");
+    const texto = input.value.trim();
+    if (!texto) return;
+
+    const user = auth.currentUser;
+    if (!user) {
+      alert("Debes iniciar sesión para enviar comentarios.");
       return;
     }
 
+    const nuevoComentario = {
+      usuario: user.email,
+      comentario: texto,
+      categoria,
+      timestamp: serverTimestamp()
+    };
 
-    const comentario = { texto, calificacion, fecha: new Date().toISOString(), categoria };
-
-
-    if (navigator.onLine) {
-      await guardarComentario(categoria, comentario);   // Guarda localmente (IndexedDB)
-      await guardarComentarioFirestore(comentario);     // Sube a Firestore
-    } else {
-      await guardarPendiente(categoria, comentario);    // Guarda como pendiente (IndexedDB)
-      alert("Estás sin conexión. Tu comentario será enviado cuando se restablezca la conexión.");
+    try {
+      await addDoc(collection(db, "comentarios"), nuevoComentario);
+      input.value = "";
+    } catch (error) {
+      console.error("No se pudo enviar, guardando offline", error);
+      await guardarComentarioPendiente(categoria, nuevoComentario);
+      input.value = "";
+      alert("No tienes conexión, tu comentario se guardará y enviará cuando recuperes la conexión.");
     }
-
-
-    document.getElementById('comentario').value = "";
-    mostrarComentarios(categoria, document.getElementById('comentarios'));
-  });
-
-
-  mostrarComentarios(categoria, document.getElementById('comentarios'));
-}
-
-
-buttons.forEach(btn => {
-  btn.addEventListener('click', () => {
-    crearFormulario(btn.dataset.tab, btn.textContent);
-  });
-});
-
-
-window.addEventListener("online", async () => {
-  const pendientes = await traerPendientes();
-  console.log("Pendientes a enviar:", pendientes);
-  for (const comentario of pendientes) {
-    await guardarComentario(comentario.categoria, comentario); // Guarda local por si acaso
-    await guardarComentarioFirestore(comentario);              // Sube a Firestore
-    await eliminarPendiente(comentario.id);                    // Elimina de pendientes
-  }
-  alert("¡Conexión restaurada! Comentarios pendientes enviados a la nube.");
-});
-
-
-function aplicarTemaGuardado() {
-  const tema = localStorage.getItem("tema") || "claro";
-  document.body.className = tema;
-  document.getElementById("tema-toggle").textContent = tema === "oscuro" ? "Claro" : "Oscuro";
-}
-
-
-document.addEventListener("DOMContentLoaded", () => {
-  aplicarTemaGuardado();
-
-
-  document.getElementById("tema-toggle").addEventListener("click", () => {
-    const nuevoTema = document.body.className === "oscuro" ? "claro" : "oscuro";
-    document.body.className = nuevoTema;
-    localStorage.setItem("tema", nuevoTema);
-    aplicarTemaGuardado();
-  });
-
-
-  // Nuevo: botón para activar notificaciones push
-  const notifBtn = document.getElementById("notificaciones-toggle");
-  if (notifBtn) {
-    notifBtn.addEventListener('click', solicitarPermisoNotificaciones);
-  }
-});
-
-
-// Registrar ambos service workers
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    // SW normal de la app
-    navigator.serviceWorker.register('/sw.js')
-      .then(reg => {
-        console.log('Service Worker registrado:', reg.scope);
-      })
-      .catch(err => {
-        console.error('Error al registrar el Service Worker:', err);
-      });
-
-
-    // SW de Firebase Messaging
-    navigator.serviceWorker.register('/firebase-messaging-sw.js')
-      .then(reg => {
-        console.log('Firebase Messaging SW registrado:', reg.scope);
-      })
-      .catch(err => {
-        console.error('Error al registrar el SW de FCM:', err);
-      });
   });
 }
 
-
-// ======================== NOTIFICACIONES PUSH (FCM) ========================
-
-
-// Pide permiso y obtiene el token FCM
-async function solicitarPermisoNotificaciones() {
-  try {
-    const permiso = await Notification.requestPermission();
-    if (permiso === 'granted') {
-      const token = await getToken(messaging, {
-        vapidKey: 'BNXs6Wmh8HeBnrqtZjgKdMCCYkv9vXUS2zWGjQU7SYvjqgGTz1zrxhfNmSYbN9kH1Gwn05GoEILAJ6s0DzafHLQ'
-      });
-      console.log('Token FCM:', token);
-      alert('¡Notificaciones activadas!');
-      // Si querés, podrías guardar el token en Firestore para enviar notis personalizadas
-    } else {
-      alert('Permiso de notificaciones denegado.');
-      console.log('Permiso de notificaciones denegado');
-    }
-  } catch (e) {
-    console.error('Error solicitando permiso de notificación', e);
-    alert('Error activando notificaciones.');
-  }
-}
-
-
-// Muestra la notificación si la app está abierta (primer plano)
-onMessage(messaging, (payload) => {
-  console.log('Mensaje recibido en primer plano:', payload);
-  if (Notification.permission === 'granted') {
-    const { title, body } = payload.notification;
-    new Notification(title, { body, icon: '/assets/icon.png' });
-  }
+// Manejar cambio de tab
+tabs.forEach(tab => {
+  tab.addEventListener("click", () => {
+    tabs.forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    mostrarCategoria(tab.getAttribute("data-tab"));
+  });
 });
 
-firebase.auth().onAuthStateChanged(user => {
-  if (user) {
-    document.getElementById("login-form").style.display = "none";
-    document.getElementById("app").style.display = "block";
-    document.getElementById("welcome").textContent = `Hola, ${user.email}!`;
-
-    solicitarPermisoNotificaciones(); // <- ¡Este es el punto clave!
-  }
+// Sincronizar cuando vuelve conexión
+window.addEventListener("online", () => {
+  sincronizarComentariosPendientes();
 });
-
-
-// ======================== FIN NOTIFICACIONES PUSH ==========================
-
-
-inicializarDB();
