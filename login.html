@@ -2,108 +2,29 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Login / Registro</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login - Encuestas CABA</title>
+  <link rel="stylesheet" href="login.css">
+
 </head>
 <body>
-  <div class="container" id="auth-container">
-    <h1 id="form-title">Iniciar Sesión</h1>
+  
+    <div id="nav">
+        <a href=""><img src="assets/logo.jpg" class="logo"/></a>
+    </div>
+
+    <h2>Bienvenido</h2>
     <input type="email" id="email" placeholder="Email" />
     <input type="password" id="password" placeholder="Contraseña" />
-    <input type="password" id="confirm-password" placeholder="Confirmar contraseña" class="hidden" />
-    <button id="submitBtn">Ingresar</button>
-    <button id="toggleBtn">¿No tenés cuenta? Registrate</button>
-    <hr />
+    <button id="loginBtn">Ingresar</button>
     <button id="googleBtn">Ingresar con Google</button>
-    <br><br>
-    <button id="volverBtn">Volver al inicio</button>
-  </div>
+    <p class="cuentatext">¿No tenés cuenta?</p>
+    <button id="crearBtn">Crear cuenta nueva</button>
+    <button id="invitadoBtn">Entrar como invitado</button>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    <p id="error" style="color:rgb(0, 68, 255);"></p>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyAk0_WA4Zal3m7b_vOC70aPaQeYZqpe_00",
-      authDomain: "examenpwa.firebaseapp.com",
-      projectId: "examenpwa",
-      storageBucket: "examenpwa.appspot.com",
-      messagingSenderId: "103530121016",
-      appId: "1:103530121016:web:c0eef3027aa38c526063cd"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
-
-    const emailInput = document.getElementById("email");
-    const passwordInput = document.getElementById("password");
-    const confirmPasswordInput = document.getElementById("confirm-password");
-    const submitBtn = document.getElementById("submitBtn");
-    const toggleBtn = document.getElementById("toggleBtn");
-    const googleBtn = document.getElementById("googleBtn");
-    const volverBtn = document.getElementById("volverBtn");
-
-    let isLogin = true;
-
-    toggleBtn.addEventListener("click", () => {
-      isLogin = !isLogin;
-      document.getElementById("form-title").textContent = isLogin ? "Iniciar Sesión" : "Registrarse";
-      confirmPasswordInput.classList.toggle("hidden");
-      submitBtn.textContent = isLogin ? "Ingresar" : "Registrarse";
-      toggleBtn.textContent = isLogin ? "¿No tenés cuenta? Registrate" : "¿Ya tenés cuenta? Iniciar sesión";
-    });
-
-    submitBtn.addEventListener("click", async () => {
-      const email = emailInput.value.trim();
-      const password = passwordInput.value;
-
-      if (!email || !password) {
-        alert("Completar todos los campos");
-        return;
-      }
-      if (!isLogin && password !== confirmPasswordInput.value) {
-        alert("Las contraseñas no coinciden");
-        return;
-      }
-
-      try {
-        if (isLogin) {
-          await signInWithEmailAndPassword(auth, email, password);
-        } else {
-          await createUserWithEmailAndPassword(auth, email, password);
-        }
-        // Al iniciar sesión guardar email en localStorage
-        localStorage.setItem("usuario", JSON.stringify({ email }));
-        window.location.href = "index.html";
-      } catch (error) {
-        alert("Error: " + error.message);
-      }
-    });
-
-    googleBtn.addEventListener("click", async () => {
-      try {
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-        localStorage.setItem("usuario", JSON.stringify({ email: user.email }));
-        window.location.href = "index.html";
-      } catch (error) {
-        alert("Error con Google: " + error.message);
-      }
-    });
-
-    volverBtn.addEventListener("click", () => {
-      window.location.href = "index.html";
-    });
-
-    // Redirigir si ya está logueado
-    onAuthStateChanged(auth, user => {
-      if (user) {
-        localStorage.setItem("usuario", JSON.stringify({ email: user.email }));
-        window.location.href = "index.html";
-      }
-    });
-  </script>
+<script type="module" src="./componentes/login.js"></script>
+  
 </body>
 </html>
